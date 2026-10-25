@@ -26,6 +26,16 @@ Press F5 in this folder to run it in an Extension Development Host.
 | `ambientTheme.pollIntervalMs` | `1000` | |
 | `ambientTheme.pauseWhenUnfocused` | `true` | |
 
+## Control panel
+
+Click the Ambient Theme icon in the activity bar, or run **Ambient Theme: Open Control Panel**, for:
+
+- live sensor and smoothed lux on a log-scale bar showing each ladder step
+- a light simulator: a fake lux slider, with an option to switch instantly instead of waiting for the dwell delay
+- a ladder editor: pick a theme per step from the installed themes, set thresholds, preview a theme, or assign a step to the current light level
+- sliders for dwell, hysteresis, smoothing and poll interval (saved to settings as you change them)
+- macOS Dark/Light test buttons, which also trigger the Automation permission prompt
+
 ## Commands
 
 - **Ambient Theme: Calibrate**: shows the current lux and lets you pick the theme you want at this level. The ladder thresholds are adjusted to match.
