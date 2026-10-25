@@ -1,0 +1,175 @@
+{
+  "name": "ambient-theme",
+  "displayName": "Ambient Theme",
+  "description": "Switches VS Code theme and macOS appearance based on the MacBook ambient light sensor.",
+  "version": "0.0.1",
+  "publisher": "local",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "os": [
+    "darwin"
+  ],
+  "categories": [
+    "Themes",
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/src/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "ambientTheme.toggle",
+        "title": "Ambient Theme: Toggle"
+      },
+      {
+        "command": "ambientTheme.pause",
+        "title": "Ambient Theme: Pause for 1 Hour"
+      },
+      {
+        "command": "ambientTheme.calibrate",
+        "title": "Ambient Theme: Calibrate"
+      },
+      {
+        "command": "ambientTheme.openPanel",
+        "title": "Ambient Theme: Open Control Panel"
+      }
+    ],
+    "configuration": {
+      "title": "Ambient Theme",
+      "properties": {
+        "ambientTheme.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically switch themes based on ambient light."
+        },
+        "ambientTheme.ladder": {
+          "type": "array",
+          "description": "Themes ordered from darkest to brightest environment. Each step applies while smoothed lux is below maxLux (null = no upper bound).",
+          "items": {
+            "type": "object",
+            "required": [
+              "theme",
+              "dark"
+            ],
+            "properties": {
+              "maxLux": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "theme": {
+                "type": "string"
+              },
+              "dark": {
+                "type": "boolean"
+              }
+            }
+          },
+          "default": [
+            {
+              "maxLux": 15,
+              "theme": "Default Dark Modern",
+              "dark": true
+            },
+            {
+              "maxLux": 80,
+              "theme": "Solarized Dark",
+              "dark": true
+            },
+            {
+              "maxLux": 400,
+              "theme": "Solarized Light",
+              "dark": false
+            },
+            {
+              "maxLux": 2000,
+              "theme": "Default Light Modern",
+              "dark": false
+            },
+            {
+              "maxLux": null,
+              "theme": "Default High Contrast Light",
+              "dark": false
+            }
+          ]
+        },
+        "ambientTheme.controlMacAppearance": {
+          "type": "boolean",
+          "default": true,
+          "description": "Also switch macOS Dark Mode when crossing between dark and light steps."
+        },
+        "ambientTheme.dwellSeconds": {
+          "type": "number",
+          "default": 20,
+          "minimum": 0,
+          "description": "How long a new light level must persist before switching."
+        },
+        "ambientTheme.hysteresis": {
+          "type": "number",
+          "default": 0.15,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Fraction a threshold must be crossed by before switching."
+        },
+        "ambientTheme.smoothing": {
+          "type": "number",
+          "default": 0.3,
+          "minimum": 0.05,
+          "maximum": 1,
+          "description": "Weight of each new reading in the moving average (lower = steadier, slower to react)."
+        },
+        "ambientTheme.pollIntervalMs": {
+          "type": "number",
+          "default": 1000,
+          "minimum": 100,
+          "description": "Sensor polling interval."
+        },
+        "ambientTheme.pauseWhenUnfocused": {
+          "type": "boolean",
+          "default": true,
+          "description": "Stop reading the sensor while no VS Code window is focused."
+        }
+      }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "ambientTheme",
+          "title": "Ambient Theme",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "ambientTheme": [
+        {
+          "type": "webview",
+          "id": "ambientTheme.panel",
+          "name": "Controls"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build:native": "./native/build.sh",
+    "compile": "tsc -p .",
+    "watch": "tsc -watch -p .",
+    "test": "npm run compile && node --test out/test/",
+    "package": "npm run build:native && npm run compile && vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.2.0",
+    "typescript": "^5.6.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/robert-fahey/ambient-theme.git"
+  }
+}
