@@ -88,7 +88,6 @@ export function panelHtml(n: string): string {
     display: flex; align-items: center; justify-content: center;
     font-size: 10.5px; font-weight: 600; white-space: nowrap; overflow: hidden;
     transition: filter .3s, box-shadow .3s;
-    cursor: default;
   }
   .seg + .seg { box-shadow: inset 1px 0 0 rgba(128,128,128,.35); }
   .seg::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--stripe); opacity: .9; }
@@ -102,6 +101,20 @@ export function panelHtml(n: string): string {
     font-variant-numeric: tabular-nums;
   }
   .bubble::after { content: ''; position: absolute; left: 50%; bottom: -4px; margin-left: -4px; border: 4px solid transparent; border-bottom: 0; border-top-color: var(--accent); }
+  .handles { position: absolute; left: 0; right: 0; top: 34px; height: 38px; pointer-events: none; z-index: 4; }
+  .handle { position: absolute; top: -5px; bottom: -5px; width: 18px; margin-left: -9px; cursor: ew-resize; pointer-events: auto; display: grid; place-items: center; touch-action: none; outline: none; }
+  .handle::before { content: ''; width: 6px; height: 26px; border-radius: 4px; background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.3), 0 2px 6px rgba(0,0,0,.35); opacity: .6; transition: opacity .15s, transform .15s, background .15s; }
+  .spectrum:hover .handle::before { opacity: .9; }
+  .handle:hover::before, .handle:focus-visible::before, .handle.dragging::before { opacity: 1; transform: scaleY(1.2); background: var(--accent); box-shadow: 0 0 0 2px #fff, 0 3px 10px rgba(0,0,0,.4); }
+  .handle .tip { position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%); padding: 3px 8px; border-radius: 7px; font-size: 11px; font-weight: 700; white-space: nowrap; pointer-events: none;
+    background: var(--vscode-editorHoverWidget-background, #252526); color: var(--vscode-editorHoverWidget-foreground, #ccc); border: 1px solid var(--accent); box-shadow: 0 4px 14px rgba(0,0,0,.35); opacity: 0; transition: opacity .15s; font-variant-numeric: tabular-nums; }
+  .handle:hover .tip, .handle:focus-visible .tip, .handle.dragging .tip { opacity: 1; }
+  .spectrum.dragging, .spectrum.dragging * { cursor: ew-resize !important; user-select: none; }
+  .spectrum.dragging .needle, .spectrum.dragging .bubble { opacity: .35; }
+  .seg { cursor: pointer; }
+  .step.flash { animation: flash 1s ease; }
+  @keyframes flash { 0%, 100% { box-shadow: none; } 30% { box-shadow: 0 0 0 3px var(--accent), 0 0 24px var(--accent); } }
+  .drag-hint { font-size: 11px; color: var(--muted); margin: 4px 2px 0; }
   .rawdot { position: absolute; bottom: -7px; width: 9px; height: 9px; margin-left: -4.5px; border-radius: 50%; background: var(--vscode-charts-blue, #3794ff); border: 2px solid var(--vscode-sideBar-background, #1e1e1e); transition: left .5s ease; z-index: 3; }
   .scale { position: relative; height: 16px; margin: 8px 2px 0; font-size: 10px; color: var(--muted); }
   .scale span { position: absolute; transform: translateX(-50%); }
@@ -219,9 +232,11 @@ export function panelHtml(n: string): string {
     <div class="needle" id="needle"></div>
     <div class="track" id="track"></div>
     <div class="rawdot" id="rawdot"></div>
+    <div class="handles" id="handles"></div>
   </div>
   <div class="scale" id="scale"></div>
   <div class="legend"><span><i class="l-smooth"></i>smoothed</span><span><i class="l-raw"></i>sensor</span></div>
+  <div class="drag-hint">Drag the edges between themes to change where they switch. Click a theme to edit it.</div>
 
   <section class="card">
     <div class="card-title"><span class="emoji">🧪</span>Simulate light<span class="hint">test without covering the sensor</span></div>
@@ -395,33 +410,55 @@ export function panelHtml(n: string): string {
   }
   function label(id) { return short(themes.get(id)?.label ?? id); }
 
+  const TOP = Math.pow(10, MAX_LOG);
+  const fromPct = (p) => Math.pow(10, p / 100 * MAX_LOG) - 1;
+  /** Rounds to friendly numbers: 0.5 steps below 10, two significant figures above. */
+  function nice(lux) {
+    if (lux < 10) return Math.max(0.5, Math.round(lux * 2) / 2);
+    const mag = Math.pow(10, Math.floor(Math.log10(lux)) - 1);
+    return Math.round(lux / mag) * mag;
+  }
+  let drag = null; // { index, ladder } while a boundary handle is being moved
+  let pending = null; // ladder just sent, shown until the saved setting comes back
+  let pendingTimer = 0;
+  const thresholds = (ladder) => JSON.stringify(ladder.map((s) => s.maxLux));
+
   function buildSegments() {
+    if (drag || pending) return;
     const key = JSON.stringify([state.ladder, themes.size]);
     if (key === segKey) return;
     segKey = key;
     const track = $('track');
+    const handles = $('handles');
     track.innerHTML = '';
-    let prev = 0;
+    handles.innerHTML = '';
     state.ladder.forEach((s, i) => {
-      const end = s.maxLux === null ? Math.pow(10, MAX_LOG) : s.maxLux;
-      const width = Math.max(0, pct(end) - pct(prev));
       const p = palette(s.theme, s.dark);
       const seg = document.createElement('div');
       seg.className = 'seg';
-      seg.style.flexBasis = width + '%';
       seg.style.background = p.background;
       seg.style.color = p.foreground;
       seg.style.setProperty('--stripe', p.keyword);
-      seg.title = (i + 1) + '. ' + label(s.theme) + ' · ' + fmt(prev) + '–' + (s.maxLux === null ? '∞' : fmt(s.maxLux)) + ' lx';
-      if (width >= 4) {
-        const l = document.createElement('span');
-        l.className = 'lbl';
-        l.textContent = width >= 16 ? label(s.theme) : String(i + 1);
-        seg.appendChild(l);
-      }
+      const l = document.createElement('span');
+      l.className = 'lbl';
+      seg.appendChild(l);
+      seg.addEventListener('click', () => focusCard(i));
       track.appendChild(seg);
-      prev = end;
+
+      if (i < state.ladder.length - 1 && s.maxLux !== null) {
+        const h = document.createElement('div');
+        h.className = 'handle';
+        h.tabIndex = 0;
+        h.setAttribute('role', 'slider');
+        h.setAttribute('aria-label', 'Boundary between ' + label(s.theme) + ' and ' + label(state.ladder[i + 1].theme));
+        const tip = document.createElement('span');
+        tip.className = 'tip';
+        h.appendChild(tip);
+        attachHandle(h, i);
+        handles.appendChild(h);
+      }
     });
+    layout(state.ladder);
 
     const scale = $('scale');
     if (!scale.childElementCount) {
@@ -433,8 +470,108 @@ export function panelHtml(n: string): string {
     }
   }
 
+  /** Sizes segments and positions handles for a ladder without rebuilding the DOM. */
+  function layout(ladder) {
+    const segs = $('track').children;
+    const handles = [...$('handles').children];
+    let prev = 0, h = 0;
+    ladder.forEach((s, i) => {
+      const end = s.maxLux === null ? TOP : s.maxLux;
+      const width = Math.max(0, pct(end) - pct(prev));
+      const seg = segs[i];
+      if (!seg) return;
+      seg.style.flexBasis = width + '%';
+      seg.title = (i + 1) + '. ' + label(s.theme) + ' · ' + fmt(prev) + '–' + (s.maxLux === null ? '∞' : fmt(s.maxLux)) + ' lx';
+      seg.firstChild.textContent = width >= 16 ? label(s.theme) : width >= 4 ? String(i + 1) : '';
+      if (i < ladder.length - 1 && s.maxLux !== null && handles[h]) {
+        handles[h].style.left = pct(end) + '%';
+        handles[h].firstChild.textContent = fmt(end) + ' lx';
+        handles[h].setAttribute('aria-valuenow', String(end));
+        h++;
+      }
+      prev = end;
+    });
+  }
+
+  /** Allowed range for boundary i, keeping a small gap to its neighbours. */
+  function bounds(ladder, i) {
+    const lo = i > 0 ? (ladder[i - 1].maxLux ?? 0) * 1.08 + 0.5 : 0.5;
+    const next = ladder[i + 1]?.maxLux;
+    const hi = next === null || next === undefined ? TOP * 0.9 : next / 1.08 - 0.5;
+    return [lo, Math.max(lo, hi)];
+  }
+
+  function moveBoundary(i, lux) {
+    const [lo, hi] = bounds(drag.ladder, i);
+    let v = nice(Math.min(hi, Math.max(lo, lux)));
+    if (v > hi) v = hi < 10 ? Math.floor(hi * 2) / 2 : Math.floor(hi);
+    if (v < lo) v = lo < 10 ? Math.ceil(lo * 2) / 2 : Math.ceil(lo);
+    drag.ladder[i].maxLux = v;
+    layout(drag.ladder);
+  }
+
+  function commitDrag() {
+    if (!drag) return;
+    const ladder = drag.ladder;
+    drag = null;
+    pending = ladder;
+    clearTimeout(pendingTimer);
+    pendingTimer = setTimeout(() => { pending = null; segKey = ''; if (state) render(); }, 3000);
+    send({ type: 'ladder', ladder });
+  }
+
+  function attachHandle(h, i) {
+    const luxAt = (clientX) => {
+      const rect = $('track').getBoundingClientRect();
+      return fromPct((clientX - rect.left) / rect.width * 100);
+    };
+    h.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      h.setPointerCapture(e.pointerId);
+      h.focus();
+      drag = { index: i, ladder: state.ladder.map((s) => ({ ...s })) };
+      h.classList.add('dragging');
+      $('spectrum').classList.add('dragging');
+    });
+    h.addEventListener('pointermove', (e) => {
+      if (drag?.index === i) moveBoundary(i, luxAt(e.clientX));
+    });
+    const end = () => {
+      if (drag?.index !== i) return;
+      h.classList.remove('dragging');
+      $('spectrum').classList.remove('dragging');
+      commitDrag();
+    };
+    h.addEventListener('pointerup', end);
+    h.addEventListener('pointercancel', end);
+
+    // Arrow keys nudge by ~5% (Shift for ~25%), saved shortly after the last press.
+    let keyTimer = 0;
+    h.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault();
+      if (!drag) drag = { index: i, ladder: state.ladder.map((s) => ({ ...s })) };
+      const cur = drag.ladder[i].maxLux;
+      const factor = e.shiftKey ? 1.25 : 1.05;
+      const next = e.key === 'ArrowRight' ? Math.max(cur * factor, cur + 1) : Math.min(cur / factor, cur - 0.5);
+      moveBoundary(i, next);
+      clearTimeout(keyTimer);
+      keyTimer = setTimeout(commitDrag, 500);
+    });
+  }
+
+  function focusCard(i) {
+    const card = document.querySelector('.step[data-index="' + i + '"]');
+    if (!card) return;
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    card.classList.remove('flash');
+    void card.offsetWidth;
+    card.classList.add('flash');
+  }
+
   function updateSpectrum() {
     buildSegments();
+    if (!drag) layout(pending ?? state.ladder);
     [...$('track').children].forEach((seg, i) => seg.classList.toggle('active', i === state.band));
     const smooth = state.smoothedLux;
     const raw = state.simulating ? state.simLux : state.rawLux;
@@ -595,7 +732,11 @@ export function panelHtml(n: string): string {
   window.addEventListener('message', (e) => {
     const msg = e.data;
     if (msg.type === 'themes') { themes = new Map(msg.themes.map((t) => [t.id, t])); segKey = ladderKey = ''; if (state) render(); }
-    if (msg.type === 'state') { state = msg.state; render(); }
+    if (msg.type === 'state') {
+      state = msg.state;
+      if (pending && thresholds(pending) === thresholds(state.ladder)) { pending = null; clearTimeout(pendingTimer); }
+      render();
+    }
     if (msg.type === 'macResult') $('macResult').textContent = msg.text;
   });
   window.addEventListener('resize', () => state && updateSpectrum());

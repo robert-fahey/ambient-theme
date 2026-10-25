@@ -9,7 +9,7 @@ A small Swift helper (`bin/als-reader`) reads lux from the sensor and streams re
 ```sh
 npm install
 npm run package           # builds the Swift helper, compiles TS, creates the .vsix
-code --install-extension ambient-theme-0.0.2.vsix
+code --install-extension ambient-theme-0.0.3.vsix
 ```
 
 Press F5 in this folder to run it in an Extension Development Host.
@@ -30,7 +30,7 @@ Press F5 in this folder to run it in an Extension Development Host.
 
 Click the Ambient Theme icon in the activity bar, or run **Ambient Theme: Open Control Panel**, for:
 
-- live sensor and smoothed lux on a log-scale bar showing each ladder step
+- live sensor and smoothed lux on a log-scale bar of the ladder steps; drag the edges between steps to move thresholds (or focus an edge and use the arrow keys)
 - a light simulator: a fake lux slider, with an option to switch instantly instead of waiting for the dwell delay
 - a ladder editor: pick a theme per step from the installed themes, set thresholds, preview a theme, or assign a step to the current light level
 - sliders for dwell, hysteresis, smoothing and poll interval (saved to settings as you change them)
