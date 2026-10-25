@@ -4,6 +4,7 @@ import { MacAppearanceError, currentTheme, setMacDarkMode, setTheme } from './ap
 import { Controller, ControllerOptions, Step, calibrate, normalizeLadder } from './ladder';
 import { Sensor } from './sensor';
 import { ControlPanel, PanelState } from './panel';
+import { isDarkTheme } from './themes';
 
 const AUTO_DETECT_PROMPTED = 'ambientTheme.autoDetectPrompted';
 
@@ -25,6 +26,11 @@ function config() {
 
 function readLadder(): Step[] {
   return normalizeLadder(config().get<Step[]>('ladder') ?? []);
+}
+
+/** A step is dark if its theme says so; the `dark` flag only matters for themes that aren't installed. */
+function isDarkStep(step: Step): boolean {
+  return isDarkTheme(step.theme) ?? step.dark;
 }
 
 function readOptions(): ControllerOptions {
@@ -148,10 +154,11 @@ export class AmbientTheme implements vscode.Disposable {
       vscode.window.showErrorMessage(`Ambient Theme: couldn't set theme "${step.theme}": ${err}`);
     }
 
-    if (!config().get<boolean>('controlMacAppearance') || step.dark === this.lastDark) return;
+    const dark = isDarkStep(step);
+    if (!config().get<boolean>('controlMacAppearance') || dark === this.lastDark) return;
     try {
-      await setMacDarkMode(step.dark);
-      this.lastDark = step.dark;
+      await setMacDarkMode(dark);
+      this.lastDark = dark;
     } catch (err) {
       if (err instanceof MacAppearanceError && err.permissionDenied) {
         await config().update('controlMacAppearance', false, vscode.ConfigurationTarget.Global);
@@ -248,7 +255,7 @@ export class AmbientTheme implements vscode.Disposable {
       band: this.controller.currentBand,
       manualOverride: this.manualOverride,
       currentTheme: currentTheme(),
-      ladder: this.ladder,
+      ladder: this.ladder.map((s) => ({ ...s, dark: isDarkStep(s) })),
       simulating: this.simulating,
       simLux: this.simLux,
       simInstant: this.simInstant,
@@ -363,7 +370,7 @@ export class AmbientTheme implements vscode.Disposable {
       this.status.text = `$(beaker) ${Math.round(this.simLux)} lx (sim)${step ? ` · ${step.theme}` : ''}`;
       this.status.tooltip = 'Simulating a light level from the Ambient Theme panel. Click to disable.';
     } else {
-      const icon = step?.dark ? '$(color-mode)' : '$(lightbulb)';
+      const icon = step && isDarkStep(step) ? '$(color-mode)' : '$(lightbulb)';
       this.status.text = `${icon} ${luxText}${step ? ` · ${step.theme}` : ''}${this.manualOverride ? ' (manual)' : ''}`;
       this.status.tooltip = this.manualOverride
         ? 'You picked a theme manually; Ambient Theme will resume when the light level changes band. Click to disable.'
