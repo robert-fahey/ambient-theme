@@ -9,7 +9,7 @@ A small Swift helper (`bin/als-reader`) reads lux from the sensor and streams re
 ```sh
 npm install
 npm run package           # builds the Swift helper, compiles TS, creates the .vsix
-code --install-extension ambient-theme-0.0.1.vsix
+code --install-extension ambient-theme-0.0.2.vsix
 ```
 
 Press F5 in this folder to run it in an Extension Development Host.

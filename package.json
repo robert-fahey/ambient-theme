@@ -2,7 +2,7 @@
   "name": "ambient-theme",
   "displayName": "Ambient Theme",
   "description": "Switches VS Code theme and macOS appearance based on the MacBook ambient light sensor.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "local",
   "license": "MIT",
   "engines": {
