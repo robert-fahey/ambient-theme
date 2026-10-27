@@ -30,6 +30,11 @@ Press F5 in this folder to run it in an Extension Development Host.
 
 Click the Ambient Theme icon in the activity bar, or run **Ambient Theme: Open Control Panel**, for:
 
+<p align="center">
+  <img src="media/screenshots/panel-dark.png" alt="Control panel at night, following the sensor on Dark Modern" width="380">
+  <img src="media/screenshots/panel-light.png" alt="Control panel in daylight, following the sensor on Light Modern" width="380">
+</p>
+
 - live sensor and smoothed lux on a log-scale bar of the ladder steps; drag the edges between steps to move thresholds (or focus an edge and use the arrow keys)
 - a light simulator: a fake lux slider, with an option to switch instantly instead of waiting for the dwell delay
 - a ladder editor: pick a theme per step from the installed themes, set thresholds, preview a theme, or assign a step to the current light level

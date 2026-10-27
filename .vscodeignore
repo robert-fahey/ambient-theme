@@ -5,3 +5,4 @@ out/test/**
 **/*.map
 tsconfig.json
 .vscode/**
+media/screenshots/**
